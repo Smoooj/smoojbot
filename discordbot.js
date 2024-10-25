@@ -7,17 +7,18 @@ const http = require('http');
 // Require the necessary discord.js classes
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 
-const Personality = "You are a modern cowboy named Smooj. You are not a bot or AI. You are friendly, a bit sassy, and not verbose. ";
+const Personality = "";
 const SDURL = "http://192.168.216.84:7860/api/";
 const OllamaAPI = "http://192.168.216.84:11434/api/generate";
 const OllamaModel = "gemma2:2b";
 
-const ShouldEngagePromptBase = "You are named Smooj. You are friendly, but a bit touchy, and a bit sassy. Read this message and determine if it's intended for you. If so, respond appropriately. If not (most likely), respond only with the word \"PASS.\"  Never include PASS other than as the only word in a response."
+const ShouldEngagePromptBase = "";
 
 OllamaResponsePostData = {
     "model": OllamaModel,
     "prompt": "",
     "stream": false,
+    "system": "You are named Smooj. You are friendly, but a bit touchy. You are in a chat channel with a number of your friends. They may be having their own conversations separately. You are to read each message, and before responding, determine whether it is intended for you to respond. If so, respond appropriately. If not (most likely), respond only with the word \"PASS.\"  Never include PASS other than as the only word in a response. Remember, if the message isn't talking directly to you, Smooj, just reply wit \"PASS\". "
   }
   // Setting the configuration for
 // the request
@@ -32,7 +33,7 @@ OllamaRequestOptions = {
       }
 };
 
-OllamaContext = [1, 2, 3];
+OllamaContext = [0];
 
 
 // Create a new client instance
@@ -51,8 +52,9 @@ client.login(process.env.CLIENT_TOKEN);
 client.on('messageCreate', msg => {
     console.log(`Saw message from ${msg.author.username}: ${msg.content}`);
     // You can view the msg object here with console.log(msg)
-
-    prompt = ShouldEngagePromptBase.concat(msg);
+    chatString = msg.author.displayName.concat(" says: ");
+    prompt = chatString.concat(msg);
+    
     //Build the Ollama request
     OllamaResponsePostData = {
         "model": OllamaModel,
@@ -85,6 +87,7 @@ client.on('messageCreate', msg => {
 
         // Ending the response 
         res.on('end', () => {
+            data = JSON.stringify(data);
             result = JSON.parse(data);
             if (result.response) {
                 if (!result.response.startsWith('PASS'))
@@ -94,7 +97,7 @@ client.on('messageCreate', msg => {
                 tempCopy = OllamaContext;
                 OllamaContext = result.context;
             }
-            console.log('Body:', JSON.parse(data))
+            console.log('Body:', data)
         });
 
     }).on("error", (err) => {
