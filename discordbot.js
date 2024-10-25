@@ -10,7 +10,7 @@ const { Client, Events, GatewayIntentBits } = require('discord.js');
 const Personality = "";
 const SDURL = "http://192.168.216.84:7860/api/";
 const OllamaAPI = "http://192.168.216.84:11434/api/generate";
-const OllamaModel = "gemma2:2b";
+const OllamaModel = "Smooj";
 
 const ShouldEngagePromptBase = "";
 
