@@ -55,7 +55,7 @@ client.on('messageCreate', msg => {
     // You can view the msg object here with console.log(msg)
     chatString = msg.author.displayName.concat(" says: ");
     prompt = chatString.concat(msg);
-
+    prompt = JSON.stringify(prompt);
     //Build the Ollama request
     PostData = {
         "model": OllamaModel,
