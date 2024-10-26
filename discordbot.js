@@ -14,7 +14,7 @@ const OllamaModel = "Smooj";
 
 const ShouldEngagePromptBase = "";
 
-//System Prompt: "You are named Smooj. You are friendly, but a bit touchy. You are in a chat channel with a number of your friends. They may be having their own conversations separately. You are to read each message, and before responding, determine whether it is intended for you to respond. If so, respond appropriately. If not (most likely), respond only with the word \"PASS.\"  Never include PASS other than as the only word in a response. Remember, if the message isn't talking directly to you, Smooj, just reply with \"PASS\". "
+const SystemPrompt = ""
 
 OllamaResponsePostData = {
     "model": OllamaModel,
@@ -55,15 +55,15 @@ client.on('messageCreate', msg => {
     // You can view the msg object here with console.log(msg)
     chatString = msg.author.displayName.concat(" says: ");
     prompt = chatString.concat(msg);
-    
+
     //Build the Ollama request
-    OllamaResponsePostData = {
+    PostData = {
         "model": OllamaModel,
         "prompt": prompt,
         "stream": false,
         "context": OllamaContext
     }
-    PostJSON = JSON.stringify(OllamaResponsePostData);
+    PostJSON = JSON.stringify(PostData);
       // Setting the configuration for
     // the request
     OllamaRequestOptions = {
@@ -88,14 +88,12 @@ client.on('messageCreate', msg => {
 
         // Ending the response 
         res.on('end', () => {
-            data = JSON.stringify(data);
             result = JSON.parse(data);
             if (result.response) {
                 if (!result.response.startsWith('PASS'))
                 {
                     client.channels.cache.get(msg.channelId).send(result.response);
                 }
-                tempCopy = OllamaContext;
                 OllamaContext = result.context;
             }
             console.log('Body:', data)
@@ -108,7 +106,6 @@ client.on('messageCreate', msg => {
     req.write(PostJSON);
     req.end();
 });
-
 
 
 
