@@ -160,7 +160,7 @@ async function GetImageWithPrompt(SDprompt, channelID)
             if (result.images) {
                 sfbuff = new Buffer.from(result.images[0], "base64");
                 sfattach = new Discord.AttachmentBuilder(sfbuff, { name: "output.png" });
-                client.channels.cache.get(channelID).send({files: sfattach});
+                client.channels.cache.get(channelID).send({files: [sfattach]});
             }
             console.log('Reply from SD:', data)
         });
