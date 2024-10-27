@@ -121,7 +121,7 @@ async function GetImageWithPrompt(prompt, channelID)
 {
     //prompt = encodeURIComponent(prompt);
     SDPayload = {
-        "prompt": "${prompt}",
+        "prompt": "prompt",
         "steps": 6,
         "sampler_name": "DPM++ SDE",
         "scheduler": "Karras",
