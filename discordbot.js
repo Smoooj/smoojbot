@@ -95,7 +95,7 @@ client.on('messageCreate', msg => {
                 if (!result.response.startsWith('PASS'))
                 {
                     message = result.response;
-                    if (message.contains('image attached'))
+                    if (message.includes('image attached'))
                     {
                         message = result.response.split('image attached:')[0];
                         SDPrompt = result.response.split('image attached:')[1];
