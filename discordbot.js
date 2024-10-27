@@ -5,7 +5,7 @@ require('dotenv').config();
 const http = require('http');
 
 // Require the necessary discord.js classes
-const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Events, GatewayIntentBits, Discord } = require('discord.js');
 
 const Personality = "";
 const SDURL = "http://192.168.216.84:7860/sdapi/v1/txt2img";
@@ -158,7 +158,7 @@ async function GetImageWithPrompt(SDprompt, channelID)
             result = JSON.parse(data);
             if (result.images) {
                 sfbuff = Buffer.from(result.images[0], 'base64');
-                sfattach = new Discord.MessageAttachment(sfbuff, "output.png");
+                sfattach = new Discord.AttachmentBuilder(sfbuff, { name: "output.png" });
                 client.channels.cache.get(channelID).send(sfattach);
                 
             }
