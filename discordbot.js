@@ -119,6 +119,8 @@ client.on('messageCreate', msg => {
 
 async function GetImageWithPrompt(prompt, channelID)
 {
+
+    /*
     //prompt = encodeURIComponent(prompt);
     SDPayload = {
         "prompt": "prompt",
@@ -169,5 +171,25 @@ async function GetImageWithPrompt(prompt, channelID)
 
     req.write(SDData);
     req.end();
+
+    */
+    //Trying a new, more modern method, fetch
+    const result = await fetch('192.168.216.84:7860/sdapi/v1/txt2img', {
+        method: 'POST',
+        body: JSON.stringify({
+            prompt: prompt,
+            steps: 6,
+            sampler_name: "DPM++ SDE",
+            scheduler: "Karras",
+            cfg_scale: 2,
+            width: 768,
+            height: 768,
+        })
+      }).then(res => res.json());
+      result.images.forEach((img, i) => {
+        const buf = Buffer.from(img, 'base64');
+        const sfattach = new Discord.MessageAttachment(buf, "output.png");
+        client.channels.cache.get(channelID).send(sfattach);
+      });
 
 }
