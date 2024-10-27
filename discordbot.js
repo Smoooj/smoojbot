@@ -186,6 +186,7 @@ async function GetImageWithPrompt(prompt, channelID)
             height: 768,
         })
       }).then(res => res.json());
+      console.log("SD Reply: ", result)
       result.images.forEach((img, i) => {
         const buf = Buffer.from(img, 'base64');
         const sfattach = new Discord.MessageAttachment(buf, "output.png");
