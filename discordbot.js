@@ -157,8 +157,8 @@ async function GetImageWithPrompt(SDprompt, channelID)
         res.on('end', () => {
             result = JSON.parse(data);
             if (result.images) {
-                const sfbuff = new Buffer.from(result.images[0].split(",")[1], "base64");
-                const sfattach = new Discord.MessageAttachment(sfbuff, "output.png");
+                sfbuff = Buffer.from(result.images[0], 'base64');
+                sfattach = new Discord.MessageAttachment(sfbuff, "output.png");
                 client.channels.cache.get(channelID).send(sfattach);
                 
             }
