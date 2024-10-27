@@ -117,13 +117,13 @@ client.on('messageCreate', msg => {
 });
 
 
-async function GetImageWithPrompt(prompt, channelID)
+async function GetImageWithPrompt(SDprompt, channelID)
 {
 
     
     //prompt = encodeURIComponent(prompt);
     SDPayload = {
-        prompt: prompt,
+        prompt: SDprompt,
         steps: 6,
         sampler_name: "DPM++ SDE",
         scheduler: "Karras",
@@ -140,7 +140,7 @@ async function GetImageWithPrompt(prompt, channelID)
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Content-Length': PostJSON.length
+            'Content-Length': SDData.length
           }
     };
 
