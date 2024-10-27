@@ -8,7 +8,7 @@ const http = require('http');
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 
 const Personality = "";
-const SDURL = "http://192.168.216.84:7860/api/";
+const SDURL = "http://192.168.216.84:7860/sdapi/v1/txt2img";
 const OllamaAPI = "http://192.168.216.84:11434/api/generate";
 const OllamaModel = "Smooj";
 
@@ -35,6 +35,8 @@ OllamaRequestOptions = {
 };
 
 OllamaContext = [0];
+
+
 
 
 // Create a new client instance
@@ -92,7 +94,14 @@ client.on('messageCreate', msg => {
             if (result.response) {
                 if (!result.response.startsWith('PASS'))
                 {
-                    client.channels.cache.get(msg.channelId).send(result.response);
+                    message = result.response;
+                    if (message.contains('image attached'))
+                    {
+                        message = result.response.split('image attached:')[0];
+                        SDPrompt = result.response.split('image attached:')[1];
+                        GetImageWithPrompt(SDPrompt, msg.channelId);
+                    }
+                    client.channels.cache.get(msg.channelId).send(message);
                 }
                 OllamaContext = result.context;
             }
@@ -108,4 +117,57 @@ client.on('messageCreate', msg => {
 });
 
 
+async function GetImageWithPrompt(prompt, channelID)
+{
+    prompt = encodeURIComponent(prompt);
+    SDPayload = {
+        "prompt": prompt,
+        "steps": 6,
+        "sampler_name": "DPM++ SDE",
+        "scheduler": "Karras",
+        "cfg_scale": 2,
+        "width": 768,
+        "height": 768,
+    }
+    SDData = JSON.stringify(SDPayload);
 
+    SDRequestOptions = {
+        hostname: '192.168.216.84',
+        port: '7860',
+        path: '/sdapi/v1/txt2img',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': PostJSON.length
+          }
+    };
+
+
+    // Sending the request
+    const req = http.request(SDRequestOptions, (res) => {
+        let data = ''
+
+        res.on('data', (chunk) => {
+            data += chunk;
+        });
+
+        // Ending the response 
+        res.on('end', () => {
+            result = JSON.parse(data);
+            if (result.images) {
+                const sfbuff = new Buffer.from(base64_img.split(",")[1], "base64");
+                const sfattach = new Discord.MessageAttachment(sfbuff, "output.png");
+                client.channels.cache.get(channelID).send(sfattach);
+                
+            }
+            console.log('Reply from SD:', data)
+        });
+
+    }).on("error", (err) => {
+        console.log("Error: ", err)
+    })
+
+    req.write(SDData);
+    req.end();
+
+}
