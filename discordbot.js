@@ -55,6 +55,10 @@ client.login(process.env.CLIENT_TOKEN);
 
 client.on('messageCreate', msg => {
     console.log(`Saw message from ${msg.author.username}: ${msg.content}`);
+    if (msg.author.displayName.includes("SmoojBot"))
+    {
+        return;
+    }
     // You can view the msg object here with console.log(msg)
     chatString = msg.author.displayName.concat(" says: ");
     prompt = chatString.concat(msg);
