@@ -5,7 +5,8 @@ require('dotenv').config();
 const http = require('http');
 
 // Require the necessary discord.js classes
-const { Client, Events, GatewayIntentBits, Discord } = require('discord.js');
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+const Discord = require('discord.js');
 
 const Personality = "";
 const SDURL = "http://192.168.216.84:7860/sdapi/v1/txt2img";
