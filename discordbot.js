@@ -97,8 +97,8 @@ client.on('messageCreate', msg => {
                     message = result.response;
                     if (message.includes('image attached'))
                     {
-                        message = result.response.split('image attached:')[0];
-                        SDPrompt = result.response.split('image attached:')[1];
+                        message = result.response.split('image attached')[0];
+                        SDPrompt = result.response.split('image attached')[1];
                         GetImageWithPrompt(SDPrompt, msg.channelId);
                     }
                     client.channels.cache.get(msg.channelId).send(message);
