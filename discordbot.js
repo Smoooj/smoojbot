@@ -174,7 +174,7 @@ async function GetImageWithPrompt(prompt, channelID)
 
     */
     //Trying a new, more modern method, fetch
-    const result = await fetch('192.168.216.84:7860/sdapi/v1/txt2img', {
+    const result = await fetch('http://192.168.216.84:7860/sdapi/v1/txt2img', {
         method: 'POST',
         body: JSON.stringify({
             prompt: prompt,
