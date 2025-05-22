@@ -12,6 +12,7 @@ const { Client, Events, GatewayIntentBits, AttachmentBuilder } = require('discor
 // Import client functions
 const { getOllamaResponse } = require('./ollamaClient.js');
 const { generateImage } = require('./stableDiffusionClient.js');
+// const { analyzeImage } = require('./cloudVisionClient.js'); // analyzeImage is no longer used
 
 // Bot-specific configurations from environment variables (if any remain here)
 const PERSONALITY = process.env.PERSONALITY || ""; // Example if used directly in prompt construction here
@@ -81,31 +82,162 @@ client.on('messageCreate', async msg => { // Made async to use await
                     messageToSend = parts[0].trim();
                     const SDPrompt = parts[1].trim();
                     
+                    // const SDPrompt = parts[1].trim(); // Already defined above
+                    // imageBase64 is handled by the new logic with postedMessage
+
                     if (SDPrompt) { // Ensure there is a prompt for SD
-                        console.log(`Requesting image generation with prompt: "${SDPrompt}"`);
+                        let initialImageBase64;
                         try {
-                            imageBase64 = await generateImage(SDPrompt);
-                        } catch (sdError) {
-                            console.error("Stable Diffusion image generation failed:", sdError);
+                            initialImageBase64 = await generateImage(SDPrompt);
+                        } catch (genError) {
+                            console.error("Initial image generation failed:", genError);
                             msg.reply("I tried to generate an image, but something went wrong. Sorry!").catch(console.error);
+                            // imageBase64 remains null or undefined, skip verification loop.
+                            // Send only text message if it exists
+                            if (messageToSend) {
+                                client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
+                            }
+                            return; // Exit this part of message processing
+                        }
+
+                        if (!initialImageBase64) {
+                            msg.reply("I tried to generate an image, but couldn't get one. Sorry!").catch(console.error);
+                            if (messageToSend) {
+                                client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
+                            }
+                            return; // Exit this part of message processing
+                        }
+
+                        // Initial Image Post
+                        const initialAttach = new AttachmentBuilder(Buffer.from(initialImageBase64, "base64"), { name: "output.png" });
+                        let postedMessage = await client.channels.cache.get(msg.channelId).send({
+                            content: messageToSend, // Text part from Ollama's initial response
+                            files: [initialAttach]
+                        }).catch(err => {
+                            console.error("Error sending initial image message:", err);
+                            msg.reply("I had trouble posting the first image. Sorry!").catch(console.error);
+                            return null; // Indicate failure
+                        });
+
+                        if (!postedMessage) { // If initial post failed
+                            // messageToSend might still be relevant if the image post failed but text is good
+                            if (messageToSend && !initialImageBase64) { // Resend text if image was the failing part
+                                 client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
+                            }
+                            return; // Exit this part of message processing
+                        }
+
+                        // Verification and Retry Loop Structure
+                        let imageVerified = false;
+                        let attempt = 1;
+                        const MAX_RETRIES = 3;
+                        let currentContent = messageToSend;
+                        let currentImageBase64ForVerification = initialImageBase64;
+
+                        while (attempt <= MAX_RETRIES && !imageVerified) {
+                            console.log(`Verification attempt ${attempt}/${MAX_RETRIES} for image with prompt: "${SDPrompt}"`);
+                            try {
+                                const verificationPrompt = `Please carefully examine the attached image. Does it accurately depict the following scene or subject: '${SDPrompt}'? Respond with only the word YES or the word NO.`;
+                                const ollamaVerificationResult = await getOllamaResponse(verificationPrompt, [], [currentImageBase64ForVerification]);
+                                let ollamaAnswer = "";
+                                if (ollamaVerificationResult && ollamaVerificationResult.response) {
+                                    ollamaAnswer = ollamaVerificationResult.response.trim().toUpperCase();
+                                }
+                                console.log(`Ollama verification response: "${ollamaAnswer}"`);
+
+                                if (ollamaAnswer === "YES") {
+                                    console.log("Ollama verification successful (YES).");
+                                    imageVerified = true;
+                                    // If attempt > 1, postedMessage was already updated.
+                                    // If attempt == 1, the original postedMessage is good.
+                                    // Ensure content is up-to-date if it changed
+                                    if (postedMessage.content !== currentContent && !postedMessage.deleted) {
+                                        await postedMessage.edit({content: currentContent}).catch(e => console.error("Error editing message content to final state:", e));
+                                    }
+                                    break;
+                                }
+
+                                // If not "YES" (mismatch or unclear response from Ollama)
+                                console.log(`Ollama verification failed or was not a clear YES (Attempt ${attempt}/${MAX_RETRIES})`);
+                                if (attempt < MAX_RETRIES) {
+                                    console.log("Attempting to generate a new image.");
+                                    const newImageBase64 = await generateImage(SDPrompt);
+                                    if (newImageBase64) {
+                                        currentContent = `${messageToSend} (Updated image: The previous one wasn't quite right.)`;
+                                        const newAttach = new AttachmentBuilder(Buffer.from(newImageBase64, "base64"), { name: "output.png" });
+                                        
+                                        try {
+                                            if(postedMessage && !postedMessage.deleted) await postedMessage.delete();
+                                        } catch (deleteError) {
+                                            console.error("Error deleting previous message:", deleteError);
+                                            // Proceed to post new one anyway, old one might linger.
+                                        }
+                                        
+                                        postedMessage = await client.channels.cache.get(msg.channelId).send({
+                                            content: currentContent,
+                                            files: [newAttach]
+                                        }).catch(err => {
+                                            console.error("Error sending replacement image message:", err);
+                                            if(postedMessage && !postedMessage.deleted) {
+                                                 postedMessage.edit(currentContent + " (Error: Failed to post updated image.)").catch(console.error);
+                                            } else {
+                                                 msg.reply("I generated a new image but failed to post it after deleting the old one.").catch(console.error);
+                                            }
+                                            return; // Exit from messageCreate handler
+                                        });
+                                        if(!postedMessage) return; 
+
+                                        currentImageBase64ForVerification = newImageBase64;
+                                    } else {
+                                        console.log("Failed to generate new image for replacement.");
+                                        if (postedMessage && !postedMessage.deleted) {
+                                            await postedMessage.edit(currentContent + " (I tried to generate a replacement, but it failed.)").catch(console.error);
+                                        }
+                                        imageVerified = true; 
+                                        break;
+                                    }
+                                } else { 
+                                    console.log("Max retries reached. Editing final message with a note.");
+                                    if (postedMessage && !postedMessage.deleted) {
+                                        // Ensure using potentially updated currentContent from a previous failed replacement
+                                        const finalContent = (currentContent.includes("Updated image") || currentContent.includes("I tried")) 
+                                                            ? currentContent 
+                                                            : `${messageToSend} (I tried a few times to get a better one, but this was the best I could do.)`;
+                                        await postedMessage.edit(finalContent).catch(console.error);
+                                    }
+                                    imageVerified = true; 
+                                    break;
+                                }
+                            } catch (verificationError) { 
+                                console.error("Error during verification/replacement attempt:", verificationError);
+                                if (attempt < MAX_RETRIES) {
+                                     console.log("Error during verification, treating as a failed attempt and trying to replace.");
+                                     // The loop structure will increment attempt and retry generation if applicable
+                                } else { 
+                                    console.log("Max retries reached due to errors in verification loop. Editing final message.");
+                                     if (postedMessage && !postedMessage.deleted) {
+                                        const errorContent = (currentContent.includes("Updated image") || currentContent.includes("I tried")) 
+                                                            ? currentContent 
+                                                            : messageToSend;
+                                        await postedMessage.edit(errorContent + " (I had trouble verifying the image, so I'll leave this one.)").catch(console.error);
+                                    }
+                                    imageVerified = true; 
+                                    break;
+                                }
+                            }
+                            attempt++; 
+                        } // End of while loop
+
+                    } else { // SDPrompt was empty
+                        // Send text message if there is one (and no image was processed)
+                        if (messageToSend) {
+                            client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
                         }
                     }
-                }
-
-                // Send text message if there is one
-                if (messageToSend) {
-                    client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
-                }
-
-                // Send image if generated
-                if (imageBase64) {
-                    try {
-                        const sfbuff = Buffer.from(imageBase64, "base64");
-                        const sfattach = new AttachmentBuilder(sfbuff, { name: "output.png" });
-                        client.channels.cache.get(msg.channelId).send({ files: [sfattach] }).catch(console.error);
-                    } catch (e) {
-                        console.error("Error processing or sending image:", e);
-                        msg.reply("I generated an image, but had trouble sending it. Sorry!").catch(console.error);
+                } else { // messageToSend did not include 'image attached'
+                    // Standard text-only response
+                    if (messageToSend) {
+                         client.channels.cache.get(msg.channelId).send(messageToSend).catch(console.error);
                     }
                 }
             }
@@ -113,8 +245,6 @@ client.on('messageCreate', async msg => { // Made async to use await
         } else {
             console.log("Received an empty or invalid response from Ollama.");
         }
-        // console.log('Ollama Body in discordbot.js:', ollamaResult); // For debugging the full result
-
     } catch (ollamaError) {
         console.error("Failed to get response from Ollama:", ollamaError);
         msg.reply("Sorry, I'm having trouble thinking right now!").catch(console.error);
