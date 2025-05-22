@@ -3,6 +3,7 @@ require('dotenv').config();
 
 // Importing http module - No longer directly used for Ollama/SD calls here
 // const http = require('http'); // Keep if other http calls are made, otherwise remove. For now, assume not needed.
+const fetch = require('node-fetch'); // Added for fetching image data
 
 // Require the necessary discord.js classes
 const { Client, Events, GatewayIntentBits, AttachmentBuilder } = require('discord.js'); // Added AttachmentBuilder directly
@@ -44,9 +45,31 @@ client.on('messageCreate', async msg => { // Made async to use await
     let chatString = msg.author.displayName.concat(" says: ");
     // Potentially add PERSONALITY or SYSTEM_PROMPT to the prompt here if desired
     let promptForOllama = `${SYSTEM_PROMPT} ${chatString} ${msg.content}`.trim(); // Example of using SYSTEM_PROMPT
+    let imageDatas = [];
+
+    if (msg.attachments.size > 0) {
+        for (const attachment of msg.attachments.values()) {
+            if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+                try {
+                    console.log(`Fetching image from: ${attachment.url}`);
+                    const response = await fetch(attachment.url);
+                    if (!response.ok) {
+                        console.error(`Failed to fetch image: ${response.statusText}`);
+                        continue; // Skip this attachment
+                    }
+                    const imageBuffer = await response.buffer();
+                    imageDatas.push(imageBuffer.toString('base64'));
+                    console.log(`Successfully fetched and encoded image: ${attachment.name}`);
+                } catch (error) {
+                    console.error(`Error processing attachment ${attachment.name}:`, error);
+                }
+            }
+        }
+    }
 
     try {
-        const ollamaResult = await getOllamaResponse(promptForOllama, OllamaContext);
+        // Pass imageDatas to getOllamaResponse. If imageDatas is empty, it will be handled by ollamaClient
+        const ollamaResult = await getOllamaResponse(promptForOllama, OllamaContext, imageDatas);
 
         if (ollamaResult && ollamaResult.response) {
             if (!ollamaResult.response.startsWith('PASS')) {

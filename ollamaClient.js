@@ -17,7 +17,7 @@ const baseOllamaRequestOptions = {
     }
 };
 
-async function getOllamaResponse(prompt, context) {
+async function getOllamaResponse(prompt, context, images) {
     return new Promise((resolve, reject) => {
         const PostData = {
             "model": OLLAMA_MODEL,
@@ -25,6 +25,11 @@ async function getOllamaResponse(prompt, context) {
             "stream": false,
             "context": context
         };
+
+        if (images && images.length > 0) {
+            PostData.images = images;
+        }
+
         const PostJSON = JSON.stringify(PostData);
 
         const currentOllamaRequestOptions = {
