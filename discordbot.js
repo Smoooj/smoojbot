@@ -19,7 +19,21 @@ const PERSONALITY = process.env.PERSONALITY || ""; // Example if used directly i
 const SHOULD_ENGAGE_PROMPT_BASE = process.env.SHOULD_ENGAGE_PROMPT_BASE || ""; // Example
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || ""; // Example
 
-let OllamaContext = [0]; 
+// Store context separately for each channel
+let channelContexts = new Map(); 
+
+// Helper function to get or initialize context for a channel
+function getChannelContext(channelId) {
+    if (!channelContexts.has(channelId)) {
+        channelContexts.set(channelId, [0]);
+    }
+    return channelContexts.get(channelId);
+}
+
+// Helper function to update context for a channel
+function updateChannelContext(channelId, newContext) {
+    channelContexts.set(channelId, newContext);
+}
 
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessageReactions] });
@@ -69,8 +83,11 @@ client.on('messageCreate', async msg => { // Made async to use await
     }
 
     try {
+        // Get channel-specific context
+        const currentChannelContext = getChannelContext(msg.channelId);
+        
         // Pass imageDatas to getOllamaResponse. If imageDatas is empty, it will be handled by ollamaClient
-        const ollamaResult = await getOllamaResponse(promptForOllama, OllamaContext, imageDatas);
+        const ollamaResult = await getOllamaResponse(promptForOllama, currentChannelContext, imageDatas);
 
         if (ollamaResult && ollamaResult.response) {
             if (!ollamaResult.response.startsWith('PASS')) {
@@ -241,7 +258,7 @@ client.on('messageCreate', async msg => { // Made async to use await
                     }
                 }
             }
-            OllamaContext = ollamaResult.context; // Update context
+            updateChannelContext(msg.channelId, ollamaResult.context); // Update channel-specific context
         } else {
             console.log("Received an empty or invalid response from Ollama.");
         }
