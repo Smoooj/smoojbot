@@ -10,7 +10,7 @@ const { Client, Events, GatewayIntentBits, AttachmentBuilder } = require('discor
 // const Discord = require('discord.js'); // Client and other classes are destructured, Discord global might be redundant
 
 // Import client functions
-const { getOllamaResponse } = require('./ollamaClient.js');
+const { getOllamaResponse, getOllamaSummary } = require('./ollamaClient.js');
 const { generateImage } = require('./stableDiffusionClient.js');
 // const { analyzeImage } = require('./cloudVisionClient.js'); // analyzeImage is no longer used
 
@@ -19,8 +19,12 @@ const PERSONALITY = process.env.PERSONALITY || ""; // Example if used directly i
 const SHOULD_ENGAGE_PROMPT_BASE = process.env.SHOULD_ENGAGE_PROMPT_BASE || ""; // Example
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || ""; // Example
 
-// Store context separately for each channel
+// Store context separately for each channel (for conversation flow)
 let channelContexts = new Map(); 
+
+// Store context separately for each user (for personalization and learning)
+// Structure: userId -> { messages: [], summary: "", lastSummarized: 0 }
+let userContexts = new Map();
 
 // Helper function to get or initialize context for a channel
 function getChannelContext(channelId) {
@@ -33,6 +37,81 @@ function getChannelContext(channelId) {
 // Helper function to update context for a channel
 function updateChannelContext(channelId, newContext) {
     channelContexts.set(channelId, newContext);
+}
+
+// Helper function to get or initialize context for a user
+function getUserContext(userId) {
+    if (!userContexts.has(userId)) {
+        userContexts.set(userId, {
+            messages: [],
+            summary: "",
+            lastSummarized: 0
+        });
+    }
+    return userContexts.get(userId);
+}
+
+// Helper function to add a message to user context
+function addUserMessage(userId, username, content, timestamp) {
+    const userContext = getUserContext(userId);
+    userContext.messages.push({
+        username: username,
+        content: content,
+        timestamp: timestamp
+    });
+    
+    // If we have more than 20 messages since last summary, trigger summarization
+    if (userContext.messages.length - userContext.lastSummarized > 20) {
+        summarizeUserContext(userId);
+    }
+}
+
+// Helper function to get recent user messages for context
+function getRecentUserMessages(userId, count = 5) {
+    const userContext = getUserContext(userId);
+    return userContext.messages.slice(-count);
+}
+
+// Helper function to summarize user context using a different model
+async function summarizeUserContext(userId) {
+    const userContext = getUserContext(userId);
+    const messagesToSummarize = userContext.messages.slice(userContext.lastSummarized);
+    
+    if (messagesToSummarize.length === 0) return;
+    
+    // Create a prompt for summarization
+    const messagesText = messagesToSummarize.map(msg => 
+        `${msg.username}: ${msg.content}`
+    ).join('\n');
+    
+    const previousSummary = userContext.summary || "No previous summary available.";
+    const summarizationPrompt = `Please create a concise summary of this user's messages and personality traits. Focus on their interests, communication style, preferences, and any personal details they've shared. Keep it under 200 words.
+
+Previous summary: ${previousSummary}
+
+Recent messages:
+${messagesText}
+
+Updated summary:`;
+
+    try {
+        // Use a different model for summarization (configurable via env var)
+        const summaryModel = process.env.OLLAMA_SUMMARY_MODEL || "llama3.2:3b";
+        console.log(`Summarizing context for user ${userId} using model ${summaryModel}...`);
+        
+        const summaryResult = await getOllamaSummary(summarizationPrompt, summaryModel);
+        
+        if (summaryResult && summaryResult.response) {
+            userContext.summary = summaryResult.response.trim();
+            userContext.lastSummarized = userContext.messages.length;
+            
+            console.log(`Updated summary for user ${userId}: ${userContext.summary.substring(0, 100)}...`);
+        } else {
+            console.error(`No response received from summary model for user ${userId}`);
+        }
+    } catch (error) {
+        console.error(`Error summarizing context for user ${userId}:`, error);
+    }
 }
 
 // Create a new client instance
@@ -57,9 +136,16 @@ client.on('messageCreate', async msg => { // Made async to use await
         return;
     }
 
+    // Track ALL user messages for context building (even if bot doesn't reply)
+    addUserMessage(msg.author.id, msg.author.username, msg.content, new Date());
+
+    // Get user context for personalization
+    const userContext = getUserContext(msg.author.id);
+    const userSummary = userContext.summary ? `\n\nWhat I know about ${msg.author.username}: ${userContext.summary}` : "";
+
     let chatString = msg.author.displayName.concat(" says: ");
     // Potentially add PERSONALITY or SYSTEM_PROMPT to the prompt here if desired
-    let promptForOllama = `${SYSTEM_PROMPT} ${chatString} ${msg.content}`.trim(); // Example of using SYSTEM_PROMPT
+    let promptForOllama = `${SYSTEM_PROMPT}${userSummary} ${chatString} ${msg.content}`.trim(); // Example of using SYSTEM_PROMPT
     let imageDatas = [];
 
     if (msg.attachments.size > 0) {

@@ -67,4 +67,50 @@ async function getOllamaResponse(prompt, context, images) {
     });
 }
 
-module.exports = { getOllamaResponse };
+// Function for summarizing user context using a different model
+async function getOllamaSummary(prompt, model) {
+    return new Promise((resolve, reject) => {
+        const PostData = {
+            "model": model,
+            "prompt": prompt,
+            "stream": false
+        };
+
+        const PostJSON = JSON.stringify(PostData);
+
+        const currentOllamaRequestOptions = {
+            ...baseOllamaRequestOptions,
+            headers: {
+                ...baseOllamaRequestOptions.headers,
+                'Content-Length': Buffer.byteLength(PostJSON)
+            }
+        };
+
+        const req = http.request(currentOllamaRequestOptions, (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    resolve(result);
+                } catch (e) {
+                    console.error("Error parsing Ollama summary response:", e);
+                    console.error("Ollama Raw Summary Response:", data);
+                    reject(e);
+                }
+            });
+        });
+
+        req.on('error', (err) => {
+            console.error("Ollama Summary Error: ", err);
+            reject(err);
+        });
+
+        req.write(PostJSON);
+        req.end();
+    });
+}
+
+module.exports = { getOllamaResponse, getOllamaSummary };
