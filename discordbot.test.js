@@ -203,4 +203,6 @@ describe('Discord Bot - Post, Verify, and Replace Logic', () => {
         expect(generateImage).toHaveBeenCalledTimes(3);
         expect(getOllamaResponse).toHaveBeenCalledTimes(4); // Command + 3 failed verifications
     });
+
+
 });
