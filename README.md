@@ -9,6 +9,9 @@ SmoojBot is an intelligent Discord chatbot that combines the power of Large Lang
 - **👁️ Image Understanding**: Analyzes and describes images shared in Discord
 - **🔄 Smart Image Verification**: Automatically verifies generated images match prompts and retries if needed
 - **💭 Context Awareness**: Maintains conversation context across messages
+- **🏠 Channel Isolation**: Separate conversation contexts for each Discord channel
+- **👤 User Personalization**: Tracks individual user preferences and conversation history
+- **🧠 Smart Summarization**: Automatically summarizes user interactions for personalized responses
 - **🐳 Docker Support**: Easy deployment with Docker containers
 
 ## Architecture
@@ -190,6 +193,7 @@ docker run -d \
 | `OLLAMA_HOSTNAME` | Ollama server hostname | `192.168.216.84` | ✅ |
 | `OLLAMA_PORT` | Ollama server port | `11434` | ✅ |
 | `OLLAMA_MODEL` | Ollama model name | `Smooj` | ✅ |
+| `OLLAMA_SUMMARY_MODEL` | Model for user context summarization | `llama3.2:3b` | ❌ |
 | `OLLAMA_API_PATH` | Ollama API endpoint | `/api/generate` | ❌ |
 | `SD_HOSTNAME` | Stable Diffusion hostname | `192.168.216.84` | ✅ |
 | `SD_PORT` | Stable Diffusion port | `7860` | ✅ |
@@ -230,11 +234,26 @@ Upload an image and ask the bot about it:
 ## How It Works
 
 1. **Message Processing**: Bot receives Discord messages and processes text/attachments
-2. **LLM Integration**: Sends prompts to Ollama for text generation and image analysis
-3. **Image Generation**: When response contains "image attached", extracts prompt and generates image via Stable Diffusion
-4. **Verification Loop**: Uses Ollama's vision capabilities to verify generated images match the prompt
-5. **Retry Logic**: If verification fails, generates new images (up to 3 attempts)
-6. **Context Management**: Maintains conversation context for coherent multi-turn conversations
+2. **Context Management**: 
+   - **Channel Context**: Maintains conversation flow within each Discord channel separately
+   - **User Context**: Tracks all messages from each user across all channels for personalization
+3. **LLM Integration**: Sends prompts to Ollama with both channel context and user personalization data
+4. **Smart Summarization**: Automatically summarizes user interactions after every 20 messages using a separate model
+5. **Image Generation**: When response contains "image attached", extracts prompt and generates image via Stable Diffusion
+6. **Verification Loop**: Uses Ollama's vision capabilities to verify generated images match the prompt
+7. **Retry Logic**: If verification fails, generates new images (up to 3 attempts)
+
+### Context System Details
+
+**Channel Isolation**: Each Discord channel maintains its own conversation context, allowing the bot to have different ongoing conversations in different channels without confusion.
+
+**User Personalization**: The bot tracks every message from every user across all channels, building a comprehensive understanding of each user's:
+- Interests and preferences
+- Communication style
+- Personal details they've shared
+- Conversation history
+
+**Automatic Summarization**: When a user has sent more than 20 messages, the bot automatically summarizes their interaction history using a dedicated summarization model (configurable via `OLLAMA_SUMMARY_MODEL`). This keeps the user context manageable while preserving important personalization data.
 
 ## Testing
 
