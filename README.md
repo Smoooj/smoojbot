@@ -71,8 +71,8 @@ OLLAMA_MODEL=Smooj
 SD_HOSTNAME=192.168.216.84
 SD_PORT=7860
 
-# Optional: Bot Personality (currently unused)
-SYSTEM_PROMPT="You are a helpful AI assistant."
+# Bot Personality Configuration
+SYSTEM_PROMPT="You are Smooj, a friendly Discord bot who remembers users and builds relationships over time. Respond like a warm, conversational friend who genuinely cares about people. Use any context you have about users naturally - reference their interests, ongoing situations, or previous conversations when relevant to the current message. Always address what they just said first, then add personal touches that enhance the conversation. Ask follow-up questions, show enthusiasm for their achievements, and be supportive during challenges. Keep responses natural and engaging, avoiding formal or robotic language. If generating images, include 'image attached' followed by a detailed prompt. Your goal is creating a welcoming community where everyone feels remembered and valued."
 ```
 
 ### 4. Run the Bot
@@ -254,6 +254,22 @@ Upload an image and ask the bot about it:
 - Conversation history
 
 **Automatic Summarization**: When a user has sent more than 20 messages, the bot automatically summarizes their interaction history using a dedicated summarization model (configurable via `OLLAMA_SUMMARY_MODEL`). This keeps the user context manageable while preserving important personalization data.
+
+## System Prompt Configuration
+
+The bot's personality and behavior are controlled by the `SYSTEM_PROMPT` environment variable. Two optimized prompts are provided:
+
+### Full System Prompt (`system-prompt-smooj.txt`)
+A comprehensive prompt with detailed guidelines for:
+- Personality traits and conversation style
+- How to use user context effectively
+- Response structure and examples
+- What to avoid in conversations
+
+### Concise System Prompt (`system-prompt-concise.txt`)
+A streamlined version perfect for environment variables, containing the essential instructions for friendly, context-aware responses.
+
+**Recommendation**: Use the concise version in your `.env` file for optimal performance while maintaining the friendly, personalized conversation style.
 
 ## Testing
 
